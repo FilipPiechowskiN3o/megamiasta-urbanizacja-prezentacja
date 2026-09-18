@@ -62,7 +62,7 @@ const CITIES: CityData[] = [
     slumPercent: 0,
     aqi: 28,
     hdi: 0.925,
-    image: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=1200&q=80',
+    image: '/images/tokio.jpg',
     tagline: 'Największy zespół miejski świata i lider infrastruktury',
     description: 'Wzorzec zrównoważonej metropolii o potężnym systemie szynowym, borykający się z kryzysem demograficznym i ryzykiem sejsmicznym.',
     keyChallenges: [
@@ -88,7 +88,7 @@ const CITIES: CityData[] = [
     slumPercent: 35,
     aqi: 280,
     hdi: 0.640,
-    image: 'https://images.unsplash.com/photo-1587474260584-136574528ed5?auto=format&fit=crop&w=1200&q=80',
+    image: '/images/delhi.jpg',
     tagline: 'Dynamicznie rosnąca metropolia Azji Południowej',
     description: 'Metropolia o wyjątkowym tempie wzrostu demograficznego, zmagająca się z katastrofalnym smogiem i wykluczeniem społecznym.',
     keyChallenges: [
@@ -114,7 +114,7 @@ const CITIES: CityData[] = [
     slumPercent: 5,
     aqi: 85,
     hdi: 0.850,
-    image: 'https://images.unsplash.com/photo-1538428494232-9c0d8a3ab403?auto=format&fit=crop&w=1200&q=80',
+    image: '/images/shanghai.jpg',
     tagline: 'Globalny hub finansowy i portowy Azji Wschodniej',
     description: 'Centrum chińskiej gospodarki z zaawansowanym systemem zarządzania miejskiego opartym na cyfryzacji i sztucznej inteligencji.',
     keyChallenges: [
@@ -140,7 +140,7 @@ const CITIES: CityData[] = [
     slumPercent: 42,
     aqi: 210,
     hdi: 0.602,
-    image: 'https://images.unsplash.com/photo-1608958435020-e8a7109ba809?auto=format&fit=crop&w=1200&q=80',
+    image: '/images/dhaka.jpg',
     tagline: 'Najgęściej zaludnione megamiasto świata',
     description: 'Cel masowej migracji klimatycznej z obszarów wiejskich zalewanych przez podnoszący się poziom wód w delcie Gangesu.',
     keyChallenges: [
@@ -166,7 +166,7 @@ const CITIES: CityData[] = [
     slumPercent: 22,
     aqi: 62,
     hdi: 0.814,
-    image: 'https://images.unsplash.com/photo-1578002171601-902a5a7645a4?auto=format&fit=crop&w=1200&q=80',
+    image: '/images/sao paulo.jpg',
     tagline: 'Gospodarcza stolica Ameryki Południowej',
     description: 'Metropolia o znacznych kontrastach społeczno-przestrzennych, gdzie nowo powstające wieżowce sąsiadują z favelami.',
     keyChallenges: [
@@ -192,7 +192,7 @@ const CITIES: CityData[] = [
     slumPercent: 38,
     aqi: 165,
     hdi: 0.731,
-    image: 'https://images.unsplash.com/photo-1572252821143-0259b39d73d6?auto=format&fit=crop&w=1200&q=80',
+    image: '/images/cairo.jpg',
     tagline: 'Największy zespół miejski Afryki Północnej',
     description: 'Historyczna metropolia nad Nilem zmagająca się z przeludnieniem, prowadząca projekt budowy Nowej Stolicy na pustyni.',
     keyChallenges: [
@@ -670,7 +670,7 @@ export default function Presentation() {
                   {/* Stock Photo Asset Card */}
                   <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm group">
                     <img
-                      src="https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=1200&q=80"
+                      src="/images/tokio.jpg"
                       alt="Tokyo Stock Photo"
                       className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-500"
                     />
@@ -1700,7 +1700,7 @@ export default function Presentation() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   <div className="lg:col-span-5 relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm min-h-[240px]">
                     <img
-                      src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80"
+                      src="/images/cairo.jpg"
                       alt="Smart City Stock Photo"
                       className="w-full h-full object-cover"
                     />
