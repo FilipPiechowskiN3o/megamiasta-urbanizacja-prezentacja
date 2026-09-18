@@ -471,6 +471,68 @@ export default function Presentation() {
   };
 
   const advStats = calcAdvancedBuilderStats();
+
+  const getResembledCity = () => {
+    const { densityNum, aqi, slumPercent } = advStats;
+
+    if (builderCountryTier === 'developed') {
+      if (builderEco >= 70 && builderTransit === 'rail') {
+        return {
+          name: 'Singapur / Kopenhaga',
+          reason: 'Wzorcowe Eko-Smart City z bezemisyjną siecią metra, bujną zielenią miejską i minimalną emisją CO₂.'
+        };
+      }
+      if (densityNum > 8000 || builderZoning === 'high') {
+        return {
+          name: 'Tokio (Japonia) / Nowy Jork (USA)',
+          reason: 'Wysokie PKB, gęsta zabudowa wieżowcowa i potężny system komunikacji szynowej przy zminimalizowanym braku mieszkań.'
+        };
+      }
+      return {
+        name: 'Londyn (Wielka Brytania) / Paryż (Francja)',
+        reason: 'Dojrzała metropolia kraju wysokorozwiniętego o zrównoważonej strukturze usługowo-finansowej.'
+      };
+    }
+
+    if (builderCountryTier === 'developing') {
+      if (densityNum > 18000 || slumPercent > 35) {
+        return {
+          name: 'Dhaka (Bangladesz) / Mumbaj (Indie)',
+        reason: 'Ekstremalnie wysoka gęstość zaludnienia, przeludnienie, wysoki udział osiedli tymczasowych (slumsów) oraz wyzwania sanitarne.'
+        };
+      }
+      if (aqi > 150 || builderProfile === 'industry') {
+        return {
+          name: 'Delhi (Indie) / Karaczi (Pakistan)',
+          reason: 'Gwałtowny wzrost ludności połączony z kryzysem jakości powietrza (smog) oraz wyzwaniami infrastrukturalnymi.'
+        };
+      }
+      return {
+        name: 'Kair (Egipt) / Lagos (Nigeria)',
+        reason: 'Szybko rosnąca metropolia w kraju rozwijającym się, wymagająca masowych inwestycji w nowe dzielnice i transport.'
+      };
+    }
+
+    // Średniorozwinięty (np. Chiny, Brazylia, Meksyk)
+    if (builderProfile === 'global' || (builderZoning === 'high' && builderTransit === 'rail')) {
+      return {
+        name: 'Szanghaj (Chiny) / Shenzhen',
+        reason: 'Nowoczesne centrum gospodarcze Azji z najdłuższą siecią metra, szybką urbanizacją pionową i dominacją globalnych usług.'
+      };
+    }
+    if (slumPercent > 18) {
+      return {
+        name: 'São Paulo (Brazylia) / Meksyk (CDMX)',
+        reason: 'Metropolia o znacznych kontrastach społeczno-przestrzennych, gdzie nowo powstające wieżowce sąsiadują z favelami.'
+      };
+    }
+    return {
+      name: 'Pekin (Chiny) / Dżakarta (Indonezja)',
+      reason: 'Wielki zespół miejski w fazie intensywnej transformacji ekologicznej i rozbudowy komunikacji zbiorowej.'
+    };
+  };
+
+  const resembledCity = getResembledCity();
   const currentIndex = calculateIndex();
   const currentStatus = getStatusText(currentIndex);
   const activeCity = CITIES.find((c) => c.id === selectedCityId) || CITIES[0];
@@ -1548,9 +1610,12 @@ export default function Presentation() {
                           <span className="text-[11px] text-slate-300">{advStats.countryName}</span>
                         </div>
 
-                        <div className="text-right">
+                        <div className="text-right flex flex-col items-end gap-1">
                           <span className="px-2.5 py-1 rounded text-[11px] font-bold bg-emerald-500 text-slate-950 font-heading">
                             Score: {advStats.score} / 100
+                          </span>
+                          <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
+                            Przypomina: {resembledCity.name.split(' / ')[0]}
                           </span>
                         </div>
                       </div>
@@ -1598,6 +1663,17 @@ export default function Presentation() {
                         </p>
                         <p>
                           <strong>3. Ryzyko Wykluczenia:</strong> Prognozowany odsetek ludności w slumsach wynosi <strong>{advStats.slumPercent}%</strong> (Poziom zamożności kraju oraz budownictwo socjalne {builderHousingInvest}%).
+                        </p>
+                      </div>
+
+                      {/* Resembled Real-World City Box */}
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1 mt-2">
+                        <div className="flex items-center gap-1.5 font-bold text-emerald-950">
+                          <Globe className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Odpowiednik w Świecie Rzeczywistym: <u className="decoration-emerald-500">{resembledCity.name}</u></span>
+                        </div>
+                        <p className="text-slate-700 leading-relaxed text-[11px]">
+                          <strong>Dlaczego te miasta?</strong> {resembledCity.reason}
                         </p>
                       </div>
                     </div>
