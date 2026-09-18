@@ -23,7 +23,8 @@ import {
   FileText,
   ArrowRight,
   BarChart3,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Award
 } from 'lucide-react';
 
 // --- DATA TYPES & CONSTANTS ---
@@ -286,7 +287,7 @@ const CHALLENGES: ChallengeCard[] = [
     effects: [
       'Wyższa temperatura w centrum miasta o 3-8°C w porównaniu z obrzeżami',
       'Brak infiltracji deszczówki prowadzący do powodzi błyskawicznych',
-      'Zwiększone zapotrzebowanie na energię do chłodzenie budynków'
+      'Zwiększone zapotrzebowanie na energię do chłodzenia budynków'
     ],
     summaryNote: 'Przeciwdziałanie UHI polega na wprowadzaniu terenów zieleni, zielonych dachów oraz nawierzchni przepuszczalnych.'
   }
@@ -300,6 +301,13 @@ const URBAN_GROWTH_DATA = [
   { year: '2010', pop: 3.55, megacities: 23 },
   { year: '2026', pop: 4.40, megacities: 45 },
   { year: '2050', pop: 6.68, megacities: 62 }
+];
+
+// Economic Tier Options for City Builder
+const COUNTRY_TIERS = [
+  { id: 'developed', label: 'Wysokorozwinięty (np. Japonia, USA)', gdpPerCapita: 48000, baseSlum: 1 },
+  { id: 'mid', label: 'Średniorozwinięty (np. Chiny, Brazylia)', gdpPerCapita: 14000, baseSlum: 18 },
+  { id: 'developing', label: 'Rozwijający się (np. Indie, Bangladesz)', gdpPerCapita: 3400, baseSlum: 44 }
 ];
 
 // --- MAIN COMPONENT ---
@@ -323,7 +331,7 @@ export default function Presentation() {
 
   // Slide 4 Interactive State
   const [activeChallengeId, setActiveChallengeId] = useState<string>('slums');
-  const [uhiDistance, setUhiDistance] = useState<number>(50); // 0 = Rural, 100 = City Center
+  const [uhiDistance, setUhiDistance] = useState<number>(50);
 
   // Slide 5 Simulator State
   const [simGreen, setSimGreen] = useState<number>(45);
@@ -331,14 +339,19 @@ export default function Presentation() {
   const [simHousing, setSimHousing] = useState<number>(40);
   const [simSmart, setSimSmart] = useState<number>(50);
 
-  // KREATOR WŁASNEGO MIASTA (City Builder State)
-  const [builderName, setBuilderName] = useState<string>('Zielona Metropolia');
+  // KREATOR WŁASNEGO MIASTA OD ZERO (ADVANCED CITY BUILDER STATE)
+  const [builderName, setBuilderName] = useState<string>('Nowa Metropolia');
+  const [builderCountryTier, setBuilderCountryTier] = useState<string>('mid');
+  const [builderPop, setBuilderPop] = useState<number>(14.5); // mln
+  const [builderArea, setBuilderArea] = useState<number>(1200); // km2
+  const [builderProfile, setBuilderProfile] = useState<'global' | 'industry' | 'admin'>('global');
   const [builderZoning, setBuilderZoning] = useState<'low' | 'med' | 'high'>('high');
-  const [builderEco, setBuilderEco] = useState<number>(65);
   const [builderTransit, setBuilderTransit] = useState<'road' | 'bus' | 'rail'>('rail');
-  const [builderParks, setBuilderParks] = useState<number>(40);
+  const [builderHousingInvest, setBuilderHousingInvest] = useState<number>(50); // %
+  const [builderEco, setBuilderEco] = useState<number>(60); // %
+  const [builderParks, setBuilderParks] = useState<number>(45); // %
 
-  // Transition Direction & Animations
+  // Transition Direction
   const [direction, setDirection] = useState<number>(1);
 
   const nextSlide = useCallback(() => {
@@ -413,16 +426,52 @@ export default function Presentation() {
     }
   };
 
-  // Calculations for City Builder Modal
-  const calcBuilderStats = () => {
-    let pop = builderZoning === 'high' ? 15.5 : builderZoning === 'med' ? 8.2 : 3.4;
-    let transitBonus = builderTransit === 'rail' ? 30 : builderTransit === 'bus' ? 15 : 0;
-    let aqi = Math.max(15, Math.round(180 - builderEco * 1.2 - transitBonus * 0.8));
-    let qol = Math.min(100, Math.round((builderEco * 0.4) + (builderParks * 0.3) + (transitBonus * 0.3)));
-    return { pop, aqi, qol };
+  // ADVANCED CITY BUILDER REALISTIC CALCULATIONS
+  const calcAdvancedBuilderStats = () => {
+    const country = COUNTRY_TIERS.find((t) => t.id === builderCountryTier) || COUNTRY_TIERS[1];
+    
+    // 1. Density
+    const densityNum = Math.round((builderPop * 1000000) / builderArea);
+
+    // 2. City GDP ($ mld)
+    const gdpMultiplier = builderProfile === 'global' ? 1.45 : builderProfile === 'industry' ? 1.15 : 1.0;
+    const totalGdpBillion = Math.round((builderPop * country.gdpPerCapita * gdpMultiplier) / 1000);
+
+    // 3. Estimated Slum %
+    const densityPenalty = densityNum > 12000 ? (densityNum - 12000) / 450 : 0;
+    const housingMitigation = (builderHousingInvest / 100) * 0.75;
+    let slumPercent = Math.max(0, Math.round((country.baseSlum + densityPenalty) * (1 - housingMitigation)));
+
+    // 4. Air Quality Smog (AQI)
+    const profileAqiBase = builderProfile === 'industry' ? 130 : builderProfile === 'global' ? 50 : 75;
+    const transitBonus = builderTransit === 'rail' ? 45 : builderTransit === 'bus' ? 20 : 0;
+    const countryAqiBase = country.id === 'developing' ? 90 : country.id === 'mid' ? 45 : 15;
+    let aqi = Math.max(15, Math.round(profileAqiBase + countryAqiBase - (builderEco * 0.8) - transitBonus));
+
+    // 5. CO2 Emission (t/capita)
+    let co2 = Math.max(1.8, (country.gdpPerCapita / 4200) * (1.2 - builderEco * 0.006));
+
+    // 6. Overall Sustainability Score
+    let score = Math.round(
+      (100 - slumPercent * 0.8) * 0.3 +
+      (Math.max(0, 300 - aqi) / 3) * 0.25 +
+      (builderParks * 0.2) +
+      (builderTransit === 'rail' ? 25 : builderTransit === 'bus' ? 15 : 5) * 1.0
+    );
+    score = Math.min(100, Math.max(10, score));
+
+    return {
+      densityNum,
+      totalGdpBillion,
+      slumPercent,
+      aqi,
+      co2: co2.toFixed(1),
+      score,
+      countryName: country.label
+    };
   };
 
-  const builderStats = calcBuilderStats();
+  const advStats = calcAdvancedBuilderStats();
   const currentIndex = calculateIndex();
   const currentStatus = getStatusText(currentIndex);
   const activeCity = CITIES.find((c) => c.id === selectedCityId) || CITIES[0];
@@ -470,17 +519,17 @@ export default function Presentation() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowCityBuilder(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 transition-all cursor-pointer shadow-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700 transition-all cursor-pointer shadow-xs"
           >
-            <SlidersHorizontal className="w-4 h-4 text-emerald-600" />
-            <span>Kreator Miasta</span>
+            <SlidersHorizontal className="w-4 h-4" />
+            <span>Kreator Miasta od 0</span>
           </button>
 
           <button
             onClick={() => setShowSummaryNotes(!showSummaryNotes)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
               showSummaryNotes
-                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
                 : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
@@ -506,7 +555,7 @@ export default function Presentation() {
         </div>
       </header>
 
-      {/* MAIN CONTENT AREA WITH COOL ANIMATIONS */}
+      {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex items-center justify-center p-4 md:p-8 max-w-7xl mx-auto w-full relative">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
@@ -633,7 +682,6 @@ export default function Presentation() {
                       </div>
                     </div>
 
-                    {/* 4 Quick Metric Cards */}
                     <div className="grid grid-cols-2 gap-3 text-xs pt-1">
                       <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                         <div className="text-slate-500">Kraje rozwijające się</div>
@@ -718,7 +766,7 @@ export default function Presentation() {
                   </div>
                 </div>
 
-                {/* Interactive Urban Forms Comparison Cards */}
+                {/* Formy Zespołów Miejskich */}
                 <div className="minimal-card p-6 rounded-2xl border border-slate-200 space-y-4">
                   <h3 className="text-base font-bold text-slate-900 font-heading flex items-center gap-2">
                     <Layers className="w-5 h-5 text-emerald-600" />
@@ -731,7 +779,6 @@ export default function Presentation() {
                         <span className="text-sm font-bold text-slate-900 font-heading">Aglomeracja Monocentryczna</span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">1 Dominujący Rdzeń</span>
                       </div>
-                      {/* Diagram SVG */}
                       <div className="h-16 w-full bg-white rounded-lg border border-slate-200 flex items-center justify-center relative overflow-hidden">
                         <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold text-xs shadow-xs z-10">Rdzeń</div>
                         <div className="absolute w-4 h-4 rounded-full bg-slate-300 top-2 left-4" />
@@ -751,7 +798,6 @@ export default function Presentation() {
                         <span className="text-sm font-bold text-slate-900 font-heading">Konurbacja</span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-700">Miasta Równorzędne</span>
                       </div>
-                      {/* Diagram SVG */}
                       <div className="h-16 w-full bg-white rounded-lg border border-slate-200 flex items-center justify-around px-4 relative">
                         <div className="w-6 h-6 rounded-full bg-slate-700 text-white text-[10px] font-bold flex items-center justify-center">M1</div>
                         <div className="w-6 h-6 rounded-full bg-slate-700 text-white text-[10px] font-bold flex items-center justify-center">M2</div>
@@ -770,7 +816,6 @@ export default function Presentation() {
                         <span className="text-sm font-bold text-slate-900 font-heading">Megalopolis</span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">Pas Zurbanizowany</span>
                       </div>
-                      {/* Diagram SVG */}
                       <div className="h-16 w-full bg-white rounded-lg border border-slate-200 flex items-center justify-center px-4 relative">
                         <div className="w-full h-4 bg-emerald-200 rounded-full flex items-center justify-between px-2">
                           <div className="w-3 h-3 rounded-full bg-emerald-700" />
@@ -807,7 +852,6 @@ export default function Presentation() {
                     </p>
                   </div>
 
-                  {/* City Selector Pills */}
                   <div className="flex flex-wrap gap-2">
                     {CITIES.map((city) => (
                       <button
@@ -825,7 +869,6 @@ export default function Presentation() {
                   </div>
                 </div>
 
-                {/* Dynamic Comparison Chart Tabs */}
                 <div className="flex items-center justify-between bg-white p-2 rounded-xl border border-slate-200">
                   <span className="text-xs font-bold text-slate-600 pl-2">Porównaj wskaźnik wszystkich miast:</span>
                   <div className="flex gap-1">
@@ -848,7 +891,6 @@ export default function Presentation() {
                   </div>
                 </div>
 
-                {/* Interactive Multi-city Bar Chart */}
                 <div className="minimal-card p-4 rounded-xl border border-slate-200">
                   <div className="h-28 flex items-end gap-3 px-2">
                     {CITIES.map((c) => {
@@ -887,9 +929,7 @@ export default function Presentation() {
                   </div>
                 </div>
 
-                {/* Active City Details + Real Photo */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* Left Specs */}
                   <div className="lg:col-span-5 space-y-4">
                     <div className="minimal-card p-6 rounded-2xl border border-slate-200 space-y-4">
                       <div className="relative h-40 rounded-xl overflow-hidden border border-slate-200">
@@ -930,7 +970,6 @@ export default function Presentation() {
                     </div>
                   </div>
 
-                  {/* Right Details */}
                   <div className="lg:col-span-7 space-y-4">
                     <div className="minimal-card p-6 rounded-2xl border border-slate-200 space-y-4">
                       <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
@@ -993,7 +1032,6 @@ export default function Presentation() {
                   </p>
                 </div>
 
-                {/* Challenge Pills */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {CHALLENGES.map((ch) => (
                     <button
@@ -1016,7 +1054,6 @@ export default function Presentation() {
                   ))}
                 </div>
 
-                {/* Interactive UHI Gradient Visualizer Slider (If UHI selected) */}
                 {activeChallengeId === 'heat' && (
                   <div className="minimal-card p-6 rounded-2xl border border-emerald-200 bg-emerald-50/30 space-y-4">
                     <div className="flex items-center justify-between">
@@ -1047,7 +1084,6 @@ export default function Presentation() {
                   </div>
                 )}
 
-                {/* Challenge Details Card & Photo */}
                 <div className="minimal-card p-6 rounded-2xl border border-slate-200 space-y-6">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
                     <div>
@@ -1071,7 +1107,6 @@ export default function Presentation() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Causes */}
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                       <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                         <TrendingUp className="w-4 h-4 text-emerald-600" />
@@ -1089,7 +1124,6 @@ export default function Presentation() {
                       </ul>
                     </div>
 
-                    {/* Effects */}
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                       <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -1127,7 +1161,6 @@ export default function Presentation() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                  {/* Left Sliders */}
                   <div className="lg:col-span-6 minimal-card p-6 rounded-2xl border border-slate-200 space-y-5">
                     <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                       <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
@@ -1217,7 +1250,6 @@ export default function Presentation() {
                     </div>
                   </div>
 
-                  {/* Right Score */}
                   <div className="lg:col-span-6 space-y-4">
                     <div className="minimal-card p-6 rounded-2xl border border-slate-200 text-center space-y-4">
                       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Wyliczony Wskaźnik Zrównoważenia</span>
@@ -1277,7 +1309,6 @@ export default function Presentation() {
                   </p>
                 </div>
 
-                {/* Photo & Solution Matrix */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   <div className="lg:col-span-5 relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm min-h-[240px]">
                     <img
@@ -1294,7 +1325,6 @@ export default function Presentation() {
                     </div>
                   </div>
 
-                  {/* 4 Solutions Grid */}
                   <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="minimal-card p-4 rounded-xl border border-slate-200 space-y-2">
                       <div className="p-2 w-fit rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
@@ -1338,7 +1368,6 @@ export default function Presentation() {
                   </div>
                 </div>
 
-                {/* Key Takeaway Box */}
                 <div className="minimal-card p-6 rounded-2xl border border-emerald-200 bg-emerald-50/40 space-y-3">
                   <h3 className="text-sm font-bold text-emerald-900 font-heading flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -1371,7 +1400,6 @@ export default function Presentation() {
 
       {/* FOOTER & NAVIGATION BAR */}
       <footer className="z-30 flex items-center justify-between px-6 py-4 bg-white border-t border-slate-200 shadow-xs">
-        {/* Slide indicators */}
         <div className="flex items-center gap-2">
           {Array.from({ length: totalSlides }).map((_, idx) => (
             <button
@@ -1393,7 +1421,6 @@ export default function Presentation() {
           </span>
         </div>
 
-        {/* Buttons */}
         <div className="flex items-center gap-3">
           <button
             onClick={prevSlide}
@@ -1423,7 +1450,7 @@ export default function Presentation() {
         </div>
       </footer>
 
-      {/* MODAL: KREATOR WŁASNEGO MIASTA (CITY BUILDER) */}
+      {/* MODAL: ADVANCED KREATOR WŁASNEGO MIASTA OD 0 */}
       <AnimatePresence>
         {showCityBuilder && (
           <motion.div
@@ -1438,16 +1465,16 @@ export default function Presentation() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white p-6 rounded-2xl border border-slate-200 max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl"
+              className="bg-white p-6 rounded-2xl border border-slate-200 max-w-4xl w-full max-h-[92vh] overflow-y-auto space-y-6 shadow-2xl"
             >
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-xs">
                     <SlidersHorizontal className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-900 font-heading">Kreator Własnego Megamiasta</h3>
-                    <p className="text-xs text-slate-500">Projektuj parametry architektoniczne i zobacz wizualną mapę miasta</p>
+                    <h3 className="text-lg font-bold text-slate-900 font-heading">Kreator Własnego Megamiasta od 0</h3>
+                    <p className="text-xs text-slate-500">Zaprojektuj metropolię od podstaw: wyznacz populację, powierzchnię, kraj i gospodarkę</p>
                   </div>
                 </div>
                 <button
@@ -1458,145 +1485,271 @@ export default function Presentation() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                {/* Controls */}
-                <div className="md:col-span-6 space-y-4 text-xs">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Nazwa Twojej Metropolii</label>
-                    <input
-                      type="text"
-                      value={builderName}
-                      onChange={(e) => setBuilderName(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 focus:outline-hidden font-semibold text-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Strefowanie & Wysokość Zabudowy</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['low', 'med', 'high'] as const).map((z) => (
-                        <button
-                          key={z}
-                          onClick={() => setBuilderZoning(z)}
-                          className={`py-2 rounded-lg text-xs font-semibold border transition-all ${
-                            builderZoning === z
-                              ? 'bg-emerald-600 text-white border-emerald-600'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {z === 'low' ? 'Niska' : z === 'med' ? 'Średnia' : 'Wieżowce'}
-                        </button>
-                      ))}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left Controls Form */}
+                <div className="lg:col-span-6 space-y-4 text-xs">
+                  {/* City Name & Country Tier */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Nazwa Miasta</label>
+                      <input
+                        type="text"
+                        value={builderName}
+                        onChange={(e) => setBuilderName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 font-semibold text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Kraj / Poziom PKB</label>
+                      <select
+                        value={builderCountryTier}
+                        onChange={(e) => setBuilderCountryTier(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 font-semibold text-slate-900 bg-white"
+                      >
+                        {COUNTRY_TIERS.map((tier) => (
+                          <option key={tier.id} value={tier.id}>
+                            {tier.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Sieć Transportu Miejskiego</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['road', 'bus', 'rail'] as const).map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setBuilderTransit(t)}
-                          className={`py-2 rounded-lg text-xs font-semibold border transition-all ${
-                            builderTransit === t
-                              ? 'bg-emerald-600 text-white border-emerald-600'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {t === 'road' ? 'Auta' : t === 'bus' ? 'Autobusy' : 'Metro & Kolej'}
-                        </button>
-                      ))}
+                  {/* Population & Area Sliders */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex justify-between font-bold text-slate-700 mb-1">
+                        <span>Populacja (mln)</span>
+                        <span className="text-emerald-700 font-mono">{builderPop.toFixed(1)}M</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="2.0"
+                        max="40.0"
+                        step="0.5"
+                        value={builderPop}
+                        onChange={(e) => setBuilderPop(Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between font-bold text-slate-700 mb-1">
+                        <span>Powierzchnia (km²)</span>
+                        <span className="text-emerald-700 font-mono">{builderArea} km²</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="200"
+                        max="6000"
+                        step="100"
+                        value={builderArea}
+                        onChange={(e) => setBuilderArea(Number(e.target.value))}
+                        className="w-full"
+                      />
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex justify-between font-bold text-slate-700 mb-1">
-                      <span>Ekologia & Dachowe OZE</span>
-                      <span className="text-emerald-700 font-mono">{builderEco}%</span>
+                  {/* Economic Profile & Zoning */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Profil Gospodarczy</label>
+                      <select
+                        value={builderProfile}
+                        onChange={(e) => setBuilderProfile(e.target.value as any)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 font-semibold text-slate-900 bg-white"
+                      >
+                        <option value="global">Global Hub (Usługi/Giełda)</option>
+                        <option value="industry">Przemysłowo-Portowy</option>
+                        <option value="admin">Stolica Administracyjna</option>
+                      </select>
                     </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={builderEco}
-                      onChange={(e) => setBuilderEco(Number(e.target.value))}
-                      className="w-full"
-                    />
+
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Typ Zabudowy</label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {[
+                          { id: 'low', name: 'Niska' },
+                          { id: 'med', name: 'Średnia' },
+                          { id: 'high', name: 'Wieżowce' }
+                        ].map((z) => (
+                          <button
+                            key={z.id}
+                            onClick={() => setBuilderZoning(z.id as any)}
+                            className={`py-2 rounded-lg text-[10px] font-semibold border transition-all text-center ${
+                              builderZoning === z.id
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {z.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <div className="flex justify-between font-bold text-slate-700 mb-1">
-                      <span>Powierzchnia Parków & Zieleni</span>
-                      <span className="text-emerald-700 font-mono">{builderParks}%</span>
+                  {/* Transit & Housing Investment */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Sieć Transportowa</label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {[
+                          { id: 'road', name: 'Auta' },
+                          { id: 'bus', name: 'Bus CNG' },
+                          { id: 'rail', name: 'Metro/Kolej' }
+                        ].map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setBuilderTransit(t.id as any)}
+                            className={`py-1.5 rounded-lg text-[10px] font-semibold border transition-all text-center ${
+                              builderTransit === t.id
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {t.name}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={builderParks}
-                      onChange={(e) => setBuilderParks(Number(e.target.value))}
-                      className="w-full"
-                    />
+                    <div>
+                      <div className="flex justify-between font-bold text-slate-700 mb-1">
+                        <span>Mieszkalnictwo Socjalne</span>
+                        <span className="text-emerald-700 font-mono">{builderHousingInvest}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={builderHousingInvest}
+                        onChange={(e) => setBuilderHousingInvest(Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Eco & Parks Sliders */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex justify-between font-bold text-slate-700 mb-1">
+                        <span>OZE & Czysta Energia</span>
+                        <span className="text-emerald-700 font-mono">{builderEco}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={builderEco}
+                        onChange={(e) => setBuilderEco(Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between font-bold text-slate-700 mb-1">
+                        <span>Zielone Parki & Dachowe Ogrody</span>
+                        <span className="text-emerald-700 font-mono">{builderParks}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={builderParks}
+                        onChange={(e) => setBuilderParks(Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Visual Canvas & Live Calculated Stats */}
-                <div className="md:col-span-6 space-y-4">
-                  {/* Dynamic SVG Visual Map of Created City */}
-                  <div className="h-44 rounded-2xl bg-slate-900 border border-slate-800 p-4 flex flex-col justify-between relative overflow-hidden text-white">
-                    {/* Background Sky/Buildings */}
-                    <div className="absolute inset-0 opacity-25 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
-                    
-                    {/* City Skyline Silhouette SVG */}
-                    <div className="absolute bottom-0 inset-x-0 h-24 flex items-end justify-center gap-1.5 px-4 opacity-80">
-                      {Array.from({ length: 9 }).map((_, i) => {
-                        const height = builderZoning === 'high' ? (40 + (i % 5) * 16) : builderZoning === 'med' ? (25 + (i % 3) * 12) : 18;
-                        const isGreen = i % 3 === 0 && builderParks > 40;
+                {/* Right Visual Output & Computed Data Card */}
+                <div className="lg:col-span-6 space-y-4">
+                  {/* Dynamic Visual City Skyline SVG Map */}
+                  <div className="h-44 rounded-2xl bg-slate-950 border border-slate-800 p-4 flex flex-col justify-between relative overflow-hidden text-white shadow-md">
+                    {/* Smog Layer Overlay Tinting */}
+                    <div
+                      className="absolute inset-0 transition-opacity duration-500 pointer-events-none"
+                      style={{
+                        backgroundColor: advStats.aqi > 180 ? 'rgba(180, 83, 9, 0.35)' : advStats.aqi > 90 ? 'rgba(217, 119, 6, 0.18)' : 'rgba(16, 185, 129, 0.05)'
+                      }}
+                    />
+
+                    {/* Skyline Render */}
+                    <div className="absolute bottom-0 inset-x-0 h-28 flex items-end justify-center gap-1.5 px-4 z-10">
+                      {Array.from({ length: 11 }).map((_, i) => {
+                        const h = builderZoning === 'high' ? (45 + (i % 6) * 16) : (25 + (i % 4) * 10);
+                        const isSlum = advStats.slumPercent > 25 && (i === 1 || i === 9);
+                        const isGreenBuilding = builderEco > 60 && i % 3 === 0;
+
                         return (
                           <div
                             key={i}
                             className={`w-6 rounded-t transition-all duration-300 ${
-                              isGreen ? 'bg-emerald-500' : 'bg-slate-700'
+                              isSlum
+                                ? 'bg-amber-800 border-t-2 border-amber-600'
+                                : isGreenBuilding
+                                ? 'bg-emerald-600 border-t-2 border-emerald-400'
+                                : 'bg-slate-700'
                             }`}
-                            style={{ height: `${height}px` }}
+                            style={{ height: `${h}px` }}
                           />
                         );
                       })}
                     </div>
 
-                    <div className="relative z-10 flex justify-between items-start">
+                    <div className="relative z-20 flex justify-between items-start">
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Twoja Metropolia</span>
-                        <div className="text-lg font-bold font-heading">{builderName || 'Twoje Miasto'}</div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Kreator Metropolii</span>
+                        <div className="text-xl font-bold font-heading">{builderName || 'Twoje Miasto'}</div>
+                        <span className="text-[11px] text-slate-300">{advStats.countryName}</span>
                       </div>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                        {builderStats.qol > 75 ? 'Eko-Smart City' : builderStats.qol > 45 ? 'Zrównoważone Miasto' : 'Przeludniona Metropolia'}
-                      </span>
+
+                      <div className="text-right">
+                        <span className="px-2 py-1 rounded text-[10px] font-bold bg-emerald-500 text-slate-950 font-heading">
+                          Score: {advStats.score} / 100
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="relative z-10 flex justify-between text-xs pt-4 border-t border-slate-800">
+                    <div className="relative z-20 grid grid-cols-4 gap-1 text-center text-xs pt-2 border-t border-slate-800/80 bg-slate-950/70 backdrop-blur-xs rounded-lg px-2 py-1.5">
                       <div>
-                        <span className="text-slate-400 text-[10px]">Populacja:</span>
-                        <div className="font-bold text-emerald-400">{builderStats.pop} mln</div>
+                        <span className="text-slate-400 text-[9px] block">Gęstość</span>
+                        <span className="font-bold font-mono text-emerald-300 text-[11px]">{advStats.densityNum.toLocaleString()} os/km²</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px]">Smog (AQI):</span>
-                        <div className="font-bold text-white">{builderStats.aqi} AQI</div>
+                        <span className="text-slate-400 text-[9px] block">PKB Miasta</span>
+                        <span className="font-bold font-mono text-white text-[11px]">${advStats.totalGdpBillion} mld</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px]">Zrównoważenie:</span>
-                        <div className="font-bold text-emerald-400">{builderStats.qol} / 100</div>
+                        <span className="text-slate-400 text-[9px] block">% Slumsów</span>
+                        <span className={`font-bold font-mono text-[11px] ${advStats.slumPercent > 30 ? 'text-rose-400' : 'text-emerald-300'}`}>
+                          {advStats.slumPercent}%
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[9px] block">Smog AQI</span>
+                        <span className={`font-bold font-mono text-[11px] ${advStats.aqi > 150 ? 'text-rose-400' : 'text-emerald-300'}`}>
+                          {advStats.aqi} AQI
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Summary Score Card */}
-                  <div className="minimal-card p-4 rounded-xl border border-slate-200 text-xs space-y-2">
-                    <strong className="text-slate-900 font-bold block">Ocena Projektu Urbanistycznego:</strong>
+                  {/* Computed Diagnostic Report Card */}
+                  <div className="minimal-card p-4 rounded-xl border border-slate-200 text-xs space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <strong className="text-slate-900 font-bold flex items-center gap-1.5">
+                        <Award className="w-4 h-4 text-emerald-600" />
+                        <span>Raport Diagnostyczny Urbanisty</span>
+                      </strong>
+                      <span className="text-[10px] font-mono text-slate-500">Emisja: {advStats.co2} t CO₂/os.</span>
+                    </div>
+
                     <p className="text-slate-600 leading-relaxed">
-                      {builderStats.qol > 75
-                        ? 'Znakomicie zbilansowane miasto! Wysoki udział transportu szynowego oraz retencji chroni mieszkańców przed smogiem i kryzysem klimatycznym.'
-                        : 'Wymaga poprawek. Zwiększ nakłady na retencję wód oraz bezemisyjną kolej miejską, aby zmniejszyć poziom smogu.'}
+                      {advStats.score > 78
+                        ? `Metropolia ${builderName} charakteryzuje się znakomitym wskaźnikiem zrównoważonego rozwoju. Wysoki udział transportu szynowego oraz zieleni miejskiej skutecznie ogranicza poziom smogu i ryzyko wykluczenia społecznego.`
+                        : advStats.score > 48
+                        ? `Metropolia ${builderName} osiąga średnie parametry życiowe. Wysoka gęstość zaludnienia (${advStats.densityNum.toLocaleString()} os./km²) generuje obciążenie sieci drogowej. Zaleca się dalsze inwestycje w mieszkalnictwo socjalne oraz koleje szynowe.`
+                        : `UWAGA: Metropolia ${builderName} zmaga się z głębokim kryzysem strukturalnym. Wysoki odsetek ludności w slumsach (${advStats.slumPercent}%) oraz katastrofalny smog (${advStats.aqi} AQI) wymagają pilnej rewitalizacji i budowy bezemisyjnego transportu miejskiego.`}
                     </p>
                   </div>
                 </div>
